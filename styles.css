@@ -1,0 +1,41 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+}
+
+#ui-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 10;
+    pointer-events: none;
+}
+
+#score-container {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    padding: 10px;
+    margin: 10px;
+    border-radius: 5px;
+    display: inline-block;
+    pointer-events: auto;
+}
+
+#message-container {
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 15px;
+    margin: 20px auto;
+    border-radius: 5px;
+    max-width: 80%;
+    text-align: center;
+    pointer-events: auto;
+    display: none;
+}
+
+.a-enter-ar {
+    bottom: 20px !important;
+}
