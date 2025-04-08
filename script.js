@@ -7,6 +7,9 @@ const gameState = {
     ]
 };
 
+// Debug mode - set to true to show treasures regardless of GPS location
+const DEBUG_MODE = true;
+
 // Initialize the game
 function initGame() {
     // Get player's location
@@ -39,11 +42,11 @@ function generateTreasures(centerLat, centerLng) {
     // Clear existing treasures
     gameState.treasures = [];
     
-    // Generate 5 treasures within 100 meters of the player
+    // Generate 5 treasures within 10 meters of the player (much closer)
     for (let i = 0; i < 5; i++) {
-        // Generate a random offset in meters
-        const latOffset = (Math.random() - 0.5) * 0.002; // Roughly 100m radius
-        const lngOffset = (Math.random() - 0.5) * 0.002;
+        // Generate a random offset in meters (smaller radius)
+        const latOffset = (Math.random() - 0.5) * 0.0002; // Roughly 10m radius
+        const lngOffset = (Math.random() - 0.5) * 0.0002;
         
         // Create a treasure object
         const treasure = {
@@ -83,57 +86,81 @@ function updateARContent(position) {
     treasuresContainer.innerHTML = '';
     
     // Loop through all treasures
-    gameState.treasures.forEach(treasure => {
+    gameState.treasures.forEach((treasure, index) => {
         // Skip if already collected
         if (treasure.collected) return;
         
-        // Calculate distance between player and treasure
-        const distance = calculateDistance(
-            userLat, userLng,
-            treasure.lat, treasure.lng
-        );
+        let x, z;
         
-        // Only show treasures within 50 meters
-        if (distance <= 50) {
-            // Calculate direction to place the AR object
-            const angle = calculateAngle(
+        if (DEBUG_MODE) {
+            // In debug mode, place treasures in a circle around the user
+            const angle = (index / gameState.treasures.length) * Math.PI * 2;
+            x = Math.sin(angle) * 3; // 3 meters away
+            z = -Math.cos(angle) * 3;
+        } else {
+            // Calculate distance between player and treasure
+            const distance = calculateDistance(
                 userLat, userLng,
                 treasure.lat, treasure.lng
             );
             
-            // Create AR entity
-            const entity = document.createElement('a-entity');
-            entity.setAttribute('id', treasure.id);
-            
-            // Position the entity relative to the user
-            // Convert GPS difference to local coordinates
-            const x = Math.sin(angle) * distance;
-            const z = -Math.cos(angle) * distance;
-            
-            entity.setAttribute('position', `${x} 0 ${z}`);
-            
-            // Add visual based on model type
-            if (treasure.model === 'chest') {
-                entity.innerHTML = `
-                    <a-box color="brown" width="1" height="0.7" depth="0.7"></a-box>
-                    <a-box color="gold" width="1" height="0.1" depth="0.7" position="0 0.4 0"></a-box>
-                `;
+            // Only show treasures within 100 meters
+            if (distance <= 100) {
+                // Calculate direction to place the AR object
+                const angle = calculateAngle(
+                    userLat, userLng,
+                    treasure.lat, treasure.lng
+                );
+                
+                // Convert GPS difference to local coordinates
+                x = Math.sin(angle) * distance;
+                z = -Math.cos(angle) * distance;
             } else {
-                entity.innerHTML = `
-                    <a-cylinder color="gold" radius="0.5" height="0.1" rotation="90 0 0"></a-cylinder>
-                `;
+                // Skip treasures that are too far away
+                return;
             }
-            
-            // Make it clickable
-            entity.setAttribute('class', 'clickable');
-            entity.setAttribute('cursor-listener', '');
-            
-            // Add event listener for collecting treasure
-            entity.addEventListener('click', () => collectTreasure(treasure));
-            
-            // Add to scene
-            treasuresContainer.appendChild(entity);
         }
+        
+        // Create AR entity
+        const entity = document.createElement('a-entity');
+        entity.setAttribute('id', treasure.id);
+        
+        // Position the entity relative to the user
+        entity.setAttribute('position', `${x} 0 ${z}`);
+        
+        // Add visual based on model type
+        if (treasure.model === 'chest') {
+            entity.innerHTML = `
+                <a-box color="brown" width="1" height="0.7" depth="0.7"></a-box>
+                <a-box color="gold" width="1" height="0.1" depth="0.7" position="0 0.4 0"></a-box>
+            `;
+        } else {
+            entity.innerHTML = `
+                <a-cylinder color="gold" radius="0.5" height="0.1" rotation="90 0 0"></a-cylinder>
+            `;
+        }
+        
+        // Make it clickable
+        entity.setAttribute('class', 'clickable');
+        entity.setAttribute('cursor-listener', '');
+        
+        // Add event listener for collecting treasure
+        entity.addEventListener('click', () => collectTreasure(treasure));
+     
+// ADD THE CODE RIGHT HERE - after click event listener, before adding to scene
+// If we're in debug mode, add directional arrows to all treasures
+// If not in debug mode, only add arrows to treasures more than 10m away
+if (DEBUG_MODE || (!DEBUG_MODE && calculateDistance(userLat, userLng, treasure.lat, treasure.lng) > 10)) {
+    // Add directional arrow
+    const arrow = document.createElement('a-entity');
+    arrow.innerHTML = `
+        <a-cone color="red" height="0.5" radius-bottom="0.2" radius-top="0" position="0 1 0"></a-cone>
+    `;
+    entity.appendChild(arrow);
+}
+        
+        // Add to scene
+        treasuresContainer.appendChild(entity);
     });
 }
 
