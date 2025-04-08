@@ -3,27 +3,282 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Treasure Hunt</title>
+    <title>AR Target Shooting</title>
     <!-- A-Frame for WebXR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-    <!-- AR.js for image tracking and location-based AR -->
+    <!-- AR.js for camera AR -->
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #ui-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #score-container {
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            display: inline-block;
+            pointer-events: auto;
+        }
+
+        #time-container {
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            position: absolute;
+            right: 0;
+            pointer-events: auto;
+        }
+
+        #message-container {
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px;
+            margin: 20px auto;
+            border-radius: 5px;
+            max-width: 80%;
+            text-align: center;
+            pointer-events: auto;
+            display: none;
+        }
+
+        #start-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 8px;
+            z-index: 20;
+        }
+    </style>
 </head>
 <body>
     <div id="ui-container">
         <div id="score-container">Score: <span id="score">0</span></div>
+        <div id="time-container">Time: <span id="time">60</span>s</div>
         <div id="message-container"></div>
     </div>
+
+    <button id="start-button">Start Game</button>
 
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
         <!-- Camera -->
         <a-entity camera></a-entity>
         
         <!-- This will be where our AR content appears -->
-        <a-entity id="treasures-container"></a-entity>
+        <a-entity id="targets-container"></a-entity>
     </a-scene>
 
-    <script src="script.js"></script>
+    <script>
+        // Game state
+        const gameState = {
+            score: 0,
+            timeRemaining: 60,
+            gameActive: false,
+            targets: [],
+            gameTimer: null
+        };
+
+        // Initialize the game
+        function initGame() {
+            // Reset game state
+            gameState.score = 0;
+            gameState.timeRemaining = 60;
+            gameState.gameActive = true;
+            gameState.targets = [];
+            
+            // Update UI
+            updateScoreUI();
+            updateTimeUI();
+            
+            // Start game timer
+            gameState.gameTimer = setInterval(() => {
+                gameState.timeRemaining--;
+                updateTimeUI();
+                
+                if (gameState.timeRemaining <= 0) {
+                    endGame();
+                }
+            }, 1000);
+            
+            // Hide start button
+            document.getElementById('start-button').style.display = 'none';
+            
+            // Show message
+            showMessage("Tap the targets as they appear!");
+            
+            // Generate initial targets
+            generateTargets();
+        }
+
+        // Generate targets in the scene
+        function generateTargets() {
+            if (!gameState.gameActive) return;
+            
+            // Clear all targets
+            const container = document.getElementById('targets-container');
+            container.innerHTML = '';
+            gameState.targets = [];
+            
+            // Create 3 targets
+            for (let i = 0; i < 3; i++) {
+                createTarget(i);
+            }
+            
+            // Schedule next target generation
+            setTimeout(generateTargets, 3000);
+        }
+
+        // Create a single target
+        function createTarget(index) {
+            // Calculate position - spread targets in front of player
+            const xPos = (Math.random() * 4 - 2); // -2 to 2 meters horizontally
+            const yPos = (Math.random() * 2 - 0.5); // -0.5 to 1.5 meters vertically
+            const zPos = -3 - (Math.random() * 2); // -3 to -5 meters depth (always in front)
+            
+            // Create target entity
+            const target = document.createElement('a-entity');
+            target.setAttribute('id', `target-${index}`);
+            target.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
+            
+            // Choose a shape and color
+            const shapes = ['sphere', 'box', 'cylinder', 'torus'];
+            const colors = ['red', 'blue', 'green', 'yellow', 'purple'];
+            
+            const shape = shapes[Math.floor(Math.random() * shapes.length)];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            
+            // Points based on size - smaller = more points
+            const size = 0.3 + (Math.random() * 0.5); // 0.3 to 0.8
+            const points = Math.floor((1 / size) * 10);
+            
+            // Create target
+            const primitive = document.createElement(`a-${shape}`);
+            primitive.setAttribute('color', color);
+            
+            if (shape === 'sphere') {
+                primitive.setAttribute('radius', size);
+            } else if (shape === 'box') {
+                primitive.setAttribute('width', size);
+                primitive.setAttribute('height', size);
+                primitive.setAttribute('depth', size);
+            } else if (shape === 'cylinder') {
+                primitive.setAttribute('radius', size);
+                primitive.setAttribute('height', size);
+            } else if (shape === 'torus') {
+                primitive.setAttribute('radius', size);
+                primitive.setAttribute('radius-tubular', size / 4);
+            }
+            
+            target.appendChild(primitive);
+            
+            // Add animation
+            const animation = document.createElement('a-animation');
+            animation.setAttribute('attribute', 'rotation');
+            animation.setAttribute('to', '0 360 0');
+            animation.setAttribute('repeat', 'indefinite');
+            animation.setAttribute('dur', '2000');
+            target.appendChild(animation);
+            
+            // Make it clickable
+            target.setAttribute('class', 'clickable');
+            target.addEventListener('click', () => {
+                if (!gameState.gameActive) return;
+                
+                // Add score
+                gameState.score += points;
+                updateScoreUI();
+                
+                // Show points gained
+                showMessage(`+${points} points!`, 1000);
+                
+                // Remove target
+                target.parentNode.removeChild(target);
+                
+                // Create a replacement target
+                setTimeout(() => {
+                    if (gameState.gameActive) {
+                        createTarget(index);
+                    }
+                }, 1000);
+            });
+            
+            // Store target info
+            gameState.targets.push({
+                id: `target-${index}`,
+                points: points
+            });
+            
+            // Add to scene
+            document.getElementById('targets-container').appendChild(target);
+        }
+
+        // End the game
+        function endGame() {
+            // Stop timer
+            clearInterval(gameState.gameTimer);
+            
+            // Set game to inactive
+            gameState.gameActive = false;
+            
+            // Show final score
+            showMessage(`Game Over! Final Score: ${gameState.score}`, 5000);
+            
+            // Show start button to play again
+            setTimeout(() => {
+                document.getElementById('start-button').style.display = 'block';
+            }, 2000);
+        }
+
+        // Update the score display
+        function updateScoreUI() {
+            document.getElementById('score').textContent = gameState.score;
+        }
+
+        // Update the time display
+        function updateTimeUI() {
+            document.getElementById('time').textContent = gameState.timeRemaining;
+        }
+
+        // Show a temporary message to the player
+        function showMessage(text, duration = 3000) {
+            const messageContainer = document.getElementById('message-container');
+            messageContainer.textContent = text;
+            messageContainer.style.display = 'block';
+            
+            setTimeout(() => {
+                messageContainer.style.display = 'none';
+            }, duration);
+        }
+
+        // Add event listener to start button
+        document.getElementById('start-button').addEventListener('click', initGame);
+    </script>
 </body>
 </html>
